@@ -37,6 +37,12 @@ struct Scoreboard: View {
   struct HostScreen: View {
     @State private var host = QuizHost()
     @State private var confirmRestart = false
+    private enum Focus: Hashable {
+      case remote
+      case answer(Int)
+      case next, playAgain
+    }
+    @FocusState private var focus: Focus?
     var body: some View {
       ScrollView {
         VStack(alignment: .leading, spacing: 32) {
@@ -55,7 +61,7 @@ struct Scoreboard: View {
             HStack(spacing: 40) {
               Button("Play with the remote", systemImage: "appletvremote.gen4") {
                 host.playRemote()
-              }.accessibilityIdentifier("remotePlay")
+              }.accessibilityIdentifier("remotePlay").focused($focus, equals: .remote)
               Button(
                 host.networkEnabled ? "Close local room" : "Invite phone controllers",
                 systemImage: "iphone.and.arrow.forward"
@@ -76,6 +82,7 @@ struct Scoreboard: View {
             Text("That's a wrap.").font(.title.bold())
             Text("Thanks for playing together.").foregroundStyle(.secondary)
             Button("Play again", systemImage: "arrow.counterclockwise") { host.restart() }
+              .focused($focus, equals: .playAgain)
           } else {
             HStack {
               Text("Question \(host.snapshot.questionID + 1) of \(host.snapshot.total)")
@@ -101,6 +108,7 @@ struct Scoreboard: View {
                     }
                   }.padding(24).frame(maxWidth: .infinity, minHeight: 90)
                 }.buttonStyle(.card).accessibilityIdentifier("answer-\(index)")
+                  .focused($focus, equals: .answer(index))
                   .disabled(
                     host.snapshot.phase != .question
                       || !host.canRemoteAnswer)
@@ -109,7 +117,7 @@ struct Scoreboard: View {
             if let explanation = host.snapshot.explanation {
               Text(explanation).font(.title3).foregroundStyle(.secondary)
               Button("Next question", systemImage: "arrow.right") { host.next() }
-                .accessibilityIdentifier("nextQuestion")
+                .accessibilityIdentifier("nextQuestion").focused($focus, equals: .next)
             } else {
               Button("Reveal answer", systemImage: "eye") {
                 host.game.reveal()
@@ -127,6 +135,15 @@ struct Scoreboard: View {
           if host.snapshot.phase != .lobby { Button("Restart game") { confirmRestart = true } }
         }.padding(64)
       }.task { await host.runClock() }.onDisappear { host.stopNetwork() }
+        .onAppear { focus = .remote }
+        .onChange(of: host.snapshot.phase) { _, phase in
+          switch phase {
+          case .lobby: focus = .remote
+          case .question: focus = .answer(0)
+          case .reveal: focus = .next
+          case .finished: focus = .playAgain
+          }
+        }
         .confirmationDialog("Restart and clear scores?", isPresented: $confirmRestart) {
           Button("Restart game", role: .destructive) { host.restart() }
         }

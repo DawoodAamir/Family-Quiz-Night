@@ -21,5 +21,5 @@ PY
 )}"
 xcrun simctl bootstatus "$simulator_id" -b
 result="build/$platform-$(date +%s).xcresult"
+trap 'if [ -d "$result" ]; then xcrun xcresulttool export attachments --path "$result" --output-path "build/Screenshots-$platform" || true; fi' EXIT
 xcodebuild -project 'Family Quiz Night.xcodeproj' -scheme "$scheme" -destination "platform=$device_platform,id=$simulator_id" -derivedDataPath build/DerivedData test -parallel-testing-enabled NO -collect-test-diagnostics never -resultBundlePath "$result"
-xcrun xcresulttool export attachments --path "$result" --output-path "build/Screenshots-$platform"
