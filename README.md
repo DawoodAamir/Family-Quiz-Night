@@ -2,6 +2,14 @@
 
 An Apple TV quiz host with iPhone and iPad team controllers. Play together on a local Wi-Fi network or use the Siri Remote for a single living-room team.
 
+## Preview
+
+Native tvOS 27 simulator captures from a complete six-round remote game.
+
+![Revealed answer and team score](Docs/Round.png)
+
+![Final scores](Docs/FinalScores.png)
+
 ## Run
 
 Open **Family Quiz Night.xcodeproj** in Xcode 27. Choose **Family Quiz Night** for Apple TV or **Family Quiz Controller** for iPhone/iPad. Both apps target OS 27. Bundle IDs are `com.dd.familyquiznight` and `com.dd.familyquiznight.controller`. Select your own development team for physical devices; no signing account is included.
