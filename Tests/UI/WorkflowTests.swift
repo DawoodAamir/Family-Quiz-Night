@@ -43,11 +43,12 @@ import XCTest
           XCUIRemote.shared.press(.select)
           return
         }
-        let focused = app.descendants(matching: .any).matching(
+        let focused = app.buttons.matching(
           NSPredicate(format: "hasFocus == true")
         ).firstMatch
         guard focused.exists else {
           XCUIRemote.shared.press(.down)
+          Thread.sleep(forTimeInterval: 0.3)
           continue
         }
         let dx = target.frame.midX - focused.frame.midX
@@ -57,6 +58,7 @@ import XCTest
         } else {
           XCUIRemote.shared.press(dx > 0 ? .right : .left)
         }
+        Thread.sleep(forTimeInterval: 0.3)
       }
       XCTFail("Could not focus \(target.identifier): \(app.debugDescription)")
     }
