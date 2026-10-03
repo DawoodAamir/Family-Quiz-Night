@@ -94,26 +94,14 @@ struct Scoreboard: View {
               }
             }
             Text(host.snapshot.prompt).font(.title.bold()).accessibilityIdentifier("questionPrompt")
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 28) {
-              ForEach(Array(host.snapshot.choices.enumerated()), id: \.offset) { index, choice in
-                Button {
-                  host.remoteAnswer(index)
-                } label: {
-                  HStack {
-                    Text(["A", "B", "C", "D"][index]).font(.headline).foregroundStyle(.secondary)
-                    Text(choice).font(.title3)
-                    Spacer()
-                    if host.snapshot.correct == index {
-                      Image(systemName: "checkmark.circle.fill").foregroundStyle(.mint)
-                    }
-                  }.padding(24).frame(maxWidth: .infinity, minHeight: 90)
-                }.buttonStyle(.card).accessibilityIdentifier("answer-\(index)")
-                  .focused($focus, equals: .answer(index))
-                  .disabled(
-                    host.snapshot.phase != .question
-                      || !host.canRemoteAnswer)
+            VStack(spacing: 28) {
+              ForEach(0..<2) { row in
+                HStack(spacing: 28) {
+                  answerButton(row * 2)
+                  answerButton(row * 2 + 1)
+                }.focusSection()
               }
-            }.focusSection()
+            }.id(host.snapshot.questionID)
             if let explanation = host.snapshot.explanation {
               Text(explanation).font(.title3).foregroundStyle(.secondary)
               Button("Next question", systemImage: "arrow.right") { host.next() }
@@ -134,25 +122,12 @@ struct Scoreboard: View {
           }
           if host.snapshot.phase != .lobby { Button("Restart game") { confirmRestart = true } }
         }.padding(64)
-      }.onMoveCommand { direction in
-        guard host.snapshot.phase == .question else { return }
-        switch focus {
-        case .answer(let index):
-          switch direction {
-          case .left: if index % 2 == 1 { focus = .answer(index - 1) }
-          case .right: if index % 2 == 0 { focus = .answer(index + 1) }
-          case .up: if index >= 2 { focus = .answer(index - 2) }
-          case .down: focus = index < 2 ? .answer(index + 2) : .reveal
-          default: break
-          }
-        case .reveal:
-          if direction == .up { focus = .answer(2) }
-        default: break
-        }
       }.task { await host.runClock() }.onDisappear { host.stopNetwork() }
         .onAppear { focus = .remote }
-        .onChange(of: host.snapshot.phase) { _, phase in
-          switch phase {
+        .task(id: host.snapshot.phase) {
+          await Task.yield()
+          guard !Task.isCancelled else { return }
+          switch host.snapshot.phase {
           case .lobby: focus = .remote
           case .question: focus = .answer(0)
           case .reveal: focus = .next
@@ -163,6 +138,21 @@ struct Scoreboard: View {
           Button("Restart game", role: .destructive) { host.restart() }
         }
     }
+    private func answerButton(_ index: Int) -> some View {
+      Button { host.remoteAnswer(index) } label: {
+        HStack {
+          Text(["A", "B", "C", "D"][index]).font(.headline).foregroundStyle(.secondary)
+          Text(host.snapshot.choices[index]).font(.title3)
+          Spacer()
+          if host.snapshot.correct == index {
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(.mint)
+          }
+        }.padding(24).frame(maxWidth: .infinity, minHeight: 90)
+      }.buttonStyle(.card).accessibilityIdentifier("answer-\(index)")
+        .focused($focus, equals: .answer(index))
+        .disabled(host.snapshot.phase != .question || !host.canRemoteAnswer)
+    }
+
   }
 #else
   struct ControllerScreen: View {
