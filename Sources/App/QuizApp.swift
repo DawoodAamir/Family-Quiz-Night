@@ -40,7 +40,7 @@ struct Scoreboard: View {
     private enum Focus: Hashable {
       case remote
       case answer(Int)
-      case next, playAgain
+      case reveal, next, playAgain
     }
     @FocusState private var focus: Focus?
     var body: some View {
@@ -122,7 +122,7 @@ struct Scoreboard: View {
               Button("Reveal answer", systemImage: "eye") {
                 host.game.reveal()
                 host.refresh()
-              }
+              }.focused($focus, equals: .reveal)
             }
           }
           if !host.snapshot.teams.isEmpty {
@@ -134,6 +134,21 @@ struct Scoreboard: View {
           }
           if host.snapshot.phase != .lobby { Button("Restart game") { confirmRestart = true } }
         }.padding(64)
+      }.onMoveCommand { direction in
+        guard host.snapshot.phase == .question else { return }
+        switch focus {
+        case .answer(let index):
+          switch direction {
+          case .left: if index % 2 == 1 { focus = .answer(index - 1) }
+          case .right: if index % 2 == 0 { focus = .answer(index + 1) }
+          case .up: if index >= 2 { focus = .answer(index - 2) }
+          case .down: focus = index < 2 ? .answer(index + 2) : .reveal
+          default: break
+          }
+        case .reveal:
+          if direction == .up { focus = .answer(2) }
+        default: break
+        }
       }.task { await host.runClock() }.onDisappear { host.stopNetwork() }
         .onAppear { focus = .remote }
         .onChange(of: host.snapshot.phase) { _, phase in
