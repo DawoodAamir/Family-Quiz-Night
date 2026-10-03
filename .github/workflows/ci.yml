@@ -1,0 +1,55 @@
+name: Checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  core:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Core tests
+        run: swift test && swift test -c release
+      - name: Unsigned release device builds
+        run: |
+          xcodebuild -project 'Family Quiz Night.xcodeproj' -scheme 'Family Quiz Controller' -configuration Release -destination 'generic/platform=iOS' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build
+          xcodebuild -project 'Family Quiz Night.xcodeproj' -scheme 'Family Quiz Night' -configuration Release -destination 'generic/platform=tvOS' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build
+  native:
+    runs-on: xcode-27
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [iOS, tvOS]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Ensure simulator runtime
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          platforms="$PLATFORM"
+          
+          for runtime_platform in $platforms; do
+            xcrun simctl list runtimes --json > /tmp/runtimes.json
+            if ! PLATFORM="$runtime_platform" python3 -c 'import json,os; r=json.load(open("/tmp/runtimes.json"))["runtimes"]; raise SystemExit(not any(x.get("isAvailable") and x.get("version", "").startswith("27.") and os.environ["PLATFORM"] in x["identifier"] for x in r))'; then
+              xcodebuild -downloadPlatform "$runtime_platform" -buildVersion 27.0 -architectureVariant arm64
+            fi
+          done
+      - name: Native quiz workflow
+        run: bash Scripts/test-ui.sh '${{ matrix.platform }}'
+      - name: Test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-workflow-${{ matrix.platform }}
+          path: |
+            build/Screenshots-*
+            build/*.xcresult
+            build/Simulator-*.png
+            build/Launch-*.log
+          if-no-files-found: ignore
